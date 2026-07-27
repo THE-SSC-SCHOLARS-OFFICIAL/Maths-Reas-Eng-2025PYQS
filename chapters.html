@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chapters — THE SSC SCHOLARS OFFICIAL</title>
+<link href="https://fonts.googleapis.com/css2?family=Roboto+Condensed:ital,wght@0,300;0,400;0,500;0,600;0,700;0,900;1,400&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<nav class="nav">
+  <a href="index.html" class="nav-brand">
+    <div class="nav-logo">SSC</div>
+    <div><div class="nav-name">SSC SCHOLARS OFFICIAL</div><div class="nav-tag" id="subject-tag">Chapterwise PYQ Mock Series</div></div>
+  </a>
+  <div class="nav-right">
+    <a href="index.html" class="nav-link">← All Subjects</a>
+  </div>
+</nav>
+
+<div class="lib" style="padding-top:36px">
+  <div class="lib-hd">
+    <h2 id="subject-h2">Loading…</h2>
+    <p id="subject-p">PART-WISE · TIMED · FULL SOLUTIONS</p>
+  </div>
+  <div class="search-bar">
+    <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+    <input type="text" id="search-box" placeholder="Search a chapter — e.g. Synonym, Algebra, Blood Relations…">
+  </div>
+  <div class="chap-grid" id="chapter-grid"></div>
+</div>
+
+<footer class="site-footer">
+  <p>THE SSC SCHOLARS OFFICIAL · Chapterwise PYQ Practice Bank · Built for serious aspirants</p>
+</footer>
+
+<!-- PART PICKER MODAL -->
+<div class="modal-backdrop" id="part-modal">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h3 id="modal-chapter-name">Chapter</h3>
+      <button class="close-x" id="modal-close">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="mode-toggle">
+        <div class="mode-card active" id="btn-mode-test" data-mode="test">
+          <div class="mc-icon">📝</div>
+          <div class="mc-name">Test Mode</div>
+          <div class="mc-desc">Exam-style, full analysis after submit</div>
+        </div>
+        <div class="mode-card" id="btn-mode-quiz" data-mode="quiz">
+          <div class="mc-icon">⚡</div>
+          <div class="mc-name">Quiz Mode</div>
+          <div class="mc-desc">Instant feedback + hints as you go</div>
+        </div>
+      </div>
+      <div class="mode-desc" id="mode-desc">
+        <b>TEST MODE</b> — answer all questions against the clock, then submit to see your full score, accuracy and solution-by-solution analysis.
+      </div>
+      <div class="parts-grid" id="parts-grid"></div>
+    </div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+<script>
+const params = new URLSearchParams(window.location.search);
+const subjectSlug = params.get('subject');
+let subjectData = null;
+let currentChapterSlug = null;
+let currentMode = 'test';
+
+async function init() {
+  const data = await DataApi.getIndex();
+  subjectData = data.subjects.find(s => s.slug === subjectSlug);
+  if (!subjectData) {
+    document.querySelector('.lib').innerHTML = '<p style="padding:40px;text-align:center">Subject not found. <a href="index.html">Go back</a></p>';
+    return;
+  }
+  document.getElementById('subject-tag').textContent = subjectData.name + ' · Chapterwise';
+  document.getElementById('subject-h2').textContent = subjectData.name;
+  document.getElementById('subject-p').textContent = `${subjectData.chapter_count} CHAPTERS · ${subjectData.total_questions.toLocaleString()} QUESTIONS`;
+  document.title = `${subjectData.name} Chapters — THE SSC SCHOLARS OFFICIAL`;
+  buildGrid('');
+}
+
+function chapterLabel(name) {
+  return name.replace(/_/g, ' ').replace(/&/g, '&amp;');
+}
+
+function buildGrid(filterText) {
+  const grid = document.getElementById('chapter-grid');
+  grid.innerHTML = '';
+  subjectData.chapters.forEach(ch => {
+    if (filterText && !ch.name.toLowerCase().includes(filterText.toLowerCase())) return;
+    const stats = Store.chapterStats(subjectSlug, ch.slug, ch.part_count);
+    const pct = ch.part_count ? Math.round((stats.completed / ch.part_count) * 100) : 0;
+
+    const card = document.createElement('div');
+    card.className = 'chap-card';
+    card.innerHTML = `
+      <div class="stripe"></div>
+      <div class="chap-name">${chapterLabel(ch.name)}</div>
+      <div class="chap-meta">
+        <span><b>${ch.total_questions}</b> Qs</span>
+        <span><b>${ch.part_count}</b> parts</span>
+        <span><b>${stats.completed}</b> done</span>
+      </div>
+      <div class="chap-progress-wrap"><div class="chap-progress" style="width:${pct}%"></div></div>
+      <div class="chap-cta">Open chapter →</div>
+    `;
+    card.onclick = () => openPartModal(ch.slug);
+    grid.appendChild(card);
+  });
+}
+
+function openPartModal(chapterSlug) {
+  currentChapterSlug = chapterSlug;
+  const ch = subjectData.chapters.find(c => c.slug === chapterSlug);
+  document.getElementById('modal-chapter-name').textContent = chapterLabel(ch.name);
+  setMode('test');
+  renderParts();
+  document.getElementById('part-modal').classList.add('show');
+}
+
+function setMode(mode) {
+  currentMode = mode;
+  document.getElementById('btn-mode-test').classList.toggle('active', mode === 'test');
+  document.getElementById('btn-mode-quiz').classList.toggle('active', mode === 'quiz');
+  document.getElementById('mode-desc').innerHTML = mode === 'test'
+    ? '<b>TEST MODE</b> — answer all questions against the clock, then submit to see your full score, accuracy and solution-by-solution analysis.'
+    : '<b>QUIZ MODE</b> — get instant correct/wrong feedback with explanation right after you mark each answer, plus an on-demand Hint button.';
+  renderParts();
+}
+document.getElementById('btn-mode-test').onclick = () => setMode('test');
+document.getElementById('btn-mode-quiz').onclick = () => setMode('quiz');
+
+function renderParts() {
+  const ch = subjectData.chapters.find(c => c.slug === currentChapterSlug);
+  const grid = document.getElementById('parts-grid');
+  grid.innerHTML = '';
+  ch.parts.forEach(p => {
+    const attempt = Store.get(subjectSlug, currentChapterSlug, p.part_no);
+    const card = document.createElement('button');
+    card.className = 'part-card';
+    let badge = '';
+    if (attempt && attempt.mode === currentMode) {
+      if (attempt.status === 'completed') badge = '<div class="part-badge done">Done</div>';
+      else if (attempt.status === 'in-progress') badge = '<div class="part-badge progress">Resume</div>';
+    }
+    const mins = Math.round(p.timer_seconds / 60);
+    card.innerHTML = `${badge}<div class="pname">Part ${p.part_no}</div><div class="pcount">${p.question_count} Qs · ${mins} min</div>`;
+    card.onclick = () => goToTest(p.part_no, currentMode);
+    grid.appendChild(card);
+  });
+}
+
+function goToTest(partNo, mode) {
+  window.location.href = `test.html?subject=${subjectSlug}&chapter=${currentChapterSlug}&part=${partNo}&mode=${mode}`;
+}
+
+document.getElementById('modal-close').onclick = () => document.getElementById('part-modal').classList.remove('show');
+document.getElementById('part-modal').addEventListener('click', (e) => {
+  if (e.target.id === 'part-modal') document.getElementById('part-modal').classList.remove('show');
+});
+
+document.getElementById('search-box').addEventListener('input', (e) => buildGrid(e.target.value));
+
+init();
+</script>
+</body>
+</html>
